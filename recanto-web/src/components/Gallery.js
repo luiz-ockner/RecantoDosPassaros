@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase-config';
 
 const Gallery = () => {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-      const fetchPhotos = async () => {
-      const photosCollection = await getDocs(collection(db, 'photos'));
-      const photosData = photosCollection.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setPhotos(photosData);
+    const fetchPhotos = async () => {
+      const response = await fetch('http://localhost:3001/api/photos');
+      const data = await response.json();
+      setPhotos(data);
       setLoading(false);
     };
     fetchPhotos();

@@ -1,39 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
-import { db, storage } from '../firebase-config';
 
 const AdminDashboard = () => {
   const [file, setFile] = useState(null);
   const [photos, setPhotos] = useState([]);
 
+  // URL base da sua API de backend
+  const API_BASE_URL = 'http://localhost:3001/api';
+
   useEffect(() => {
     // Carrega as fotos existentes ao iniciar
     const fetchPhotos = async () => {
-      const photosCollection = await getDocs(collection(db, 'photos'));
-      const photosData = photosCollection.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setPhotos(photosData);
+      const response = await fetch(`${API_BASE_URL}/photos`);
+      if (!response.ok) {
+        console.error('Erro ao buscar fotos:', response.statusText);
+      } else {
+        const data = await response.json();
+        setPhotos(data);
+      }
     };
     fetchPhotos();
   }, []);
 
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (file) {
-      const storageRef = ref(storage, `gallery/${file.name}`);
-      await uploadBytes(storageRef, file);
-      const photoURL = await getDownloadURL(storageRef);
+    if (!file) {
+      alert('Por favor, selecione um arquivo.');
+      return;
+    }
 
-      // Adiciona a URL da foto no Firestore (banco de dados)
-      await addDoc(collection(db, 'photos'), {
-        url: photoURL,
-        createdAt: new Date(),
+    const formData = new FormData();
+    formData.append('photo', file); // 'photo' deve ser o mesmo nome do campo usado no Multer (upload.single('photo'))
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        body: formData,
       });
 
-      setFile(null); // Limpa o estado após o upload
-      // Atualiza a lista de fotos
-      const newPhotos = [...photos, { url: photoURL, id: Date.now() }];
-      setPhotos(newPhotos);
+      if (response.ok) {
+        const newPhoto = await response.json();
+        // Adiciona a nova foto no início da lista para que apareça de forma imediata
+        setPhotos([newPhoto, ...photos]);
+        setFile(null); // Limpa o estado para o próximo upload
+        // Opcional: limpa o input do tipo file no formulário
+        e.target.reset();
+      } else {
+        console.error('Erro no upload da foto.');
+        alert(
+          'Erro no upload da foto. Verifique o console para mais detalhes.'
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      alert('Erro ao fazer upload. Verifique se o servidor está rodando.');
     }
   };
 
@@ -48,18 +67,28 @@ const AdminDashboard = () => {
       <hr />
       <h3>Galeria Atual</h3>
       <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-        {photos.map((photo) => (
-          <img
-            key={photo.id}
-            src={photo.url}
-            alt="Galeria"
-            style={{ width: '150px', height: '150px', objectFit: 'cover', margin: '5px' }}
-          />
-        ))}
+        {photos.length > 0 ? (
+          photos.map((photo) => (
+            <img
+              key={photo.PhotoId}
+              // O caminho completo para a imagem no servidor.
+              // Note que a URL é `http://localhost:3001` + o caminho retornado pela API.
+              src={`http://localhost:3001/${photo.Url.replace(/\\/g, '/')}`}
+              alt="Galeria"
+              style={{
+                width: '150px',
+                height: '150px',
+                objectFit: 'cover',
+                margin: '5px',
+              }}
+            />
+          ))
+        ) : (
+          <p>Nenhuma foto na galeria ainda.</p>
+        )}
       </div>
     </div>
   );
-
 };
 
 export default AdminDashboard;

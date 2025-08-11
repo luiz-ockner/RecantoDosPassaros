@@ -1,20 +1,41 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase-config';
 
 const Login = ({ setIsAdmin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // URL base da sua API de backend
+  const API_BASE_URL = 'http://localhost:3001/api';
+
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      setIsAdmin(true); // Se o login for bem-sucedido, define como admin
+      const response = await fetch(`${API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao fazer login');
+      }
+
+      const data = await response.json();
+      if (response.ok) {
+        setIsAdmin(true); // Se a resposta for 200, define como admin
+      } else {
+        setError(data.message || 'Erro no login. Tente novamente.');
+      }
     } catch (err) {
-      setError('Email ou senha incorretos.');
       console.error(err);
+      setError(
+        'Não foi possível conectar ao servidor. Verifique se o backend está rodando.'
+      );
     }
   };
 
